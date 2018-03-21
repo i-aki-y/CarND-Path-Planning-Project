@@ -200,8 +200,13 @@ int main() {
   	map_waypoints_dx.push_back(d_x);
   	map_waypoints_dy.push_back(d_y);
   }
+  // 0:left, 1:middle, 2:right;
+  int lane = 1;
 
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  // reference velocity
+  double ref_vel = 0.0; // mph
+
+  h.onMessage([&ref_vel, &lane, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -209,12 +214,6 @@ int main() {
     //auto sdata = string(data).substr(0, length);
     //cout << sdata << endl;
     if (length && length > 2 && data[0] == '4' && data[1] == '2') {
-
-      // 0:left, 1:middle, 2:right;
-      int lane = 1;
-
-      // reference velocity
-      double ref_vel = 49.5; // mph
 
       auto s = hasData(data);
 
@@ -261,12 +260,11 @@ int main() {
           int prev_size = previous_path_x.size();
 
 
-          if(prev_size  < 0){
+          if(prev_size > 0){
             car_s = end_path_s;
           }
 
           bool too_close = false;
-
 
           //find ref_v to use
           for(int i = 0; i < sensor_fusion.size(); i++){
@@ -282,14 +280,28 @@ int main() {
               check_car_s += ((double)prev_size * 0.02 * check_speed);
 
               if((check_car_s > car_s) && ((check_car_s - car_s) < 30)){
-                ref_vel = 29.5; //mph
-
+                //ref_vel = 29.5; //mph
+                cout << i << ": " << check_car_s - car_s << ": " << ref_vel << endl;
+                too_close = true;
               }
             }
           }
 
+          if(lane == 0 && too_close){
+            lane = 1;
+          }else if(lane == 1 && too_close){
+            lane = 0;
+          }
 
-            if(prev_size < 2){
+
+          if(too_close){
+            ref_vel -= 0.224; // ~ 5 m/s^2
+          }else if(ref_vel < 49.5) {
+            ref_vel += 0.224;
+          }
+
+
+          if(prev_size < 2){
 
             double prev_car_x = car_x - cos(car_yaw);
             double prev_car_y = car_y - sin(car_yaw);
