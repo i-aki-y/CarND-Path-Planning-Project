@@ -212,7 +212,7 @@ int main() {
   }
   // 0:left, 1:middle, 2:right;
 
-  PathPlanner pp = PathPlanner(0.0, 1, 30, 0.02, 4);
+  PathPlanner pp = PathPlanner(0.0, 1, 30, DELTA_T, LANE_WIDTH);
 
   h.onMessage([&pp, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
@@ -276,39 +276,20 @@ int main() {
           pp.UpdateOtherCarStatus(sensor_fusion_vec);
           pp.UpdateTarget();
 
-
           vector<double> ptsx;
           vector<double> ptsy;
 
-          if(pp.prev_size_ < 2){
+          Utils::Segment last_seg = pp.GetLastSegment();
 
-            double prev_car_x = car_x - cos(pp.target_car_.yaw_);
-            double prev_car_y = car_y - sin(pp.target_car_.yaw_);
+          ptsx.push_back(last_seg.x_prev_);
+          ptsx.push_back(last_seg.x_);
 
-            ptsx.push_back(prev_car_x);
-            ptsx.push_back(car_x);
+          ptsy.push_back(last_seg.y_prev_);
+          ptsy.push_back(last_seg.y_);
 
-            ptsy.push_back(prev_car_y);
-            ptsy.push_back(car_y);
-
-            cout << "prev_size < 2" << endl;
-
-          }else{
-
-            ref_x = previous_path_x[pp.prev_size_ - 1];
-            ref_y = previous_path_y[pp.prev_size_ - 1];
-
-            double ref_x_prev = previous_path_x[pp.prev_size_ - 2];
-            double ref_y_prev = previous_path_y[pp.prev_size_ - 2];
-            ref_yaw = atan2(ref_y - ref_y_prev, ref_x - ref_x_prev);
-
-            ptsx.push_back(ref_x_prev);
-            ptsx.push_back(ref_x);
-
-            ptsy.push_back(ref_y_prev);
-            ptsy.push_back(ref_y);
-
-          }
+          ref_x = last_seg.x_;
+          ref_y = last_seg.y_;
+          ref_yaw = last_seg.GetYaw();
 
           vector<double> next_wp0 = getXY(pp.target_car_.s_ + 30, (2 + 4 * pp.target_lane_num_), map_waypoints_s, map_waypoints_x, map_waypoints_y);
           vector<double> next_wp1 = getXY(pp.target_car_.s_ + 60, (2 + 4 * pp.target_lane_num_), map_waypoints_s, map_waypoints_x, map_waypoints_y);
