@@ -10,6 +10,10 @@
 #include "json.hpp"
 #include "spline.h"
 
+#include"SensorFusion.h"
+#include "CarInfo.h"
+
+
 using namespace std;
 
 // for convenience
@@ -164,6 +168,33 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s, const vec
 
 }
 
+
+inline vector<double> transform_coordinate(double x, double y, double ref_x, double ref_y, double ref_yaw) {
+
+  double shift_x = x - ref_x;
+  double shift_y = y - ref_y;
+
+  x = (shift_x * cos(0 - ref_yaw) - shift_y * sin(0 - ref_yaw));
+  y = (shift_x * sin(0 - ref_yaw) + shift_y * cos(0 - ref_yaw));
+
+  return {x, y};
+}
+
+inline vector<double> transform_back_coordinate(double x, double y, double ref_x, double ref_y, double ref_yaw) {
+
+  double x_back = (x * cos(ref_yaw) - y * sin(ref_yaw));
+  double y_back = (x * sin(ref_yaw) + y * cos(ref_yaw));
+
+  x_back += ref_x;
+  y_back += ref_y;
+
+  return {x_back, y_back};
+}
+
+//
+const double LANE_WIDTH = 4;
+const double DELTA_T = 0.02;
+
 int main() {
   uWS::Hub h;
 
@@ -266,22 +297,22 @@ int main() {
 
           bool too_close = false;
 
-          //find ref_v to use
-          for(int i = 0; i < sensor_fusion.size(); i++){
-            //car is in my lane
-            float d = sensor_fusion[i][6];
-            if(d < (2 + 4 * lane + 2) && d > (2 + 4 * lane - 2))
-            {
-              double vx = sensor_fusion[i][3];
-              double vy = sensor_fusion[i][4];
-              double check_speed = sqrt(vx*vx + vy*vy);
-              double check_car_s = sensor_fusion[i][5];
+          vector<SensorFusion> sensor_fusion_vec;
+          for (int i = 0; i < sensor_fusion.size(); i++) {
+            auto sf = sensor_fusion[i];
+            sensor_fusion_vec.push_back(SensorFusion(sf[0], sf[1], sf[2], sf[3], sf[4], sf[5], sf[6]));
+          }
 
-              check_car_s += ((double)prev_size * 0.02 * check_speed);
+          //find ref_v to use
+          for(SensorFusion sf : sensor_fusion_vec) {
+            //car is in my lane
+            if(sf.car_info_.IsLane(lane, LANE_WIDTH))
+            {
+              double check_car_s = sf.car_info_.s_ + ((double)prev_size * DELTA_T * sf.car_info_.speed_);
 
               if((check_car_s > car_s) && ((check_car_s - car_s) < 30)){
-                //ref_vel = 29.5; //mph
-                cout << i << ": " << check_car_s - car_s << ": " << ref_vel << endl;
+                // ref_vel = 29.5; //mph
+                // cout << i << ": " << check_car_s - car_s << ": " << ref_vel << endl;
                 too_close = true;
               }
             }
@@ -345,11 +376,9 @@ int main() {
           for(int i = 0; i < ptsx.size(); i++){
 
             // transform coordinate
-            double shift_x = ptsx[i] - ref_x;
-            double shift_y = ptsy[i] - ref_y;
-
-            ptsx[i] = (shift_x * cos(0 - ref_yaw) - shift_y * sin(0 - ref_yaw));
-            ptsy[i] = (shift_x * sin(0 - ref_yaw) + shift_y * cos(0 - ref_yaw));
+            auto xy = transform_coordinate(ptsx[i], ptsy[i], ref_x, ref_y, ref_yaw);
+            ptsx[i] = xy[0];
+            ptsy[i] = xy[1];
           }
 
           tk::spline s;
@@ -375,17 +404,10 @@ int main() {
 
             x_add_on = x_point;
 
-            double x_ref = x_point;
-            double y_ref = y_point;
+            auto xy = transform_back_coordinate(x_point, y_point, ref_x, ref_y, ref_yaw);
+            next_x_vals.push_back(xy[0]);
+            next_y_vals.push_back(xy[1]);
 
-            x_point = (x_ref * cos(ref_yaw) - y_ref * sin(ref_yaw));
-            y_point = (x_ref * sin(ref_yaw) + y_ref * cos(ref_yaw));
-
-            x_point += ref_x;
-            y_point += ref_y;
-
-            next_x_vals.push_back(x_point);
-            next_y_vals.push_back(y_point);
           }
 
           /////////////////////////////////////
