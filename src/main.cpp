@@ -8,11 +8,10 @@
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "json.hpp"
-#include "spline.h"
+
 
 #include"SensorFusion.h"
 #include "CarInfo.h"
-
 #include "PathPlanner.h"
 
 
@@ -142,37 +141,12 @@ vector<double> getFrenet(double x, double y, double theta, const vector<double> 
 
 }
 
-// Transform from Frenet s,d coordinates to Cartesian x,y
-vector<double> getXY(double s, double d, const vector<double> &maps_s, const vector<double> &maps_x, const vector<double> &maps_y)
-{
-	int prev_wp = -1;
-
-	while(s > maps_s[prev_wp+1] && (prev_wp < (int)(maps_s.size()-1) ))
-	{
-		prev_wp++;
-	}
-
-	int wp2 = (prev_wp+1)%maps_x.size();
-
-	double heading = atan2((maps_y[wp2]-maps_y[prev_wp]),(maps_x[wp2]-maps_x[prev_wp]));
-	// the x,y,s along the segment
-	double seg_s = (s-maps_s[prev_wp]);
-
-	double seg_x = maps_x[prev_wp]+seg_s*cos(heading);
-	double seg_y = maps_y[prev_wp]+seg_s*sin(heading);
-
-	double perp_heading = heading-pi()/2;
-
-	double x = seg_x + d*cos(perp_heading);
-	double y = seg_y + d*sin(perp_heading);
-
-	return {x,y};
-
-}
-
 //
 const double LANE_WIDTH = 4;
 const double DELTA_T = 0.02;
+const double MAX_VELOCITY = 49.5; // mph
+const int PATH_SMAPLE = 50;
+
 
 int main() {
   uWS::Hub h;
@@ -212,7 +186,7 @@ int main() {
   }
   // 0:left, 1:middle, 2:right;
 
-  PathPlanner pp = PathPlanner(0.0, 1, 30, DELTA_T, LANE_WIDTH);
+  PathPlanner pp = PathPlanner(0.0, 1, 30, PATH_SMAPLE, DELTA_T, LANE_WIDTH, MAX_VELOCITY);
 
   h.onMessage([&pp, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
@@ -262,84 +236,14 @@ int main() {
           pp.ResetCurrentPathInfo(CarInfo(car_x, car_y, car_s, car_d, deg2rad(car_yaw), car_speed),
                                   previous_path_x, previous_path_y, end_path_s, end_path_d);
 
-          double ref_x = car_x;
-          double ref_y = car_y;
-          double ref_yaw = deg2rad(car_yaw);
-
           vector<SensorFusion> sensor_fusion_vec;
-          for (int i = 0; i < sensor_fusion.size(); i++) {
-            auto sf = sensor_fusion[i];
+          for (auto sf : sensor_fusion) {
             sensor_fusion_vec.push_back(SensorFusion(sf[0], sf[1], sf[2], sf[3], sf[4], sf[5], sf[6]));
           }
 
-          pp.too_close_ = false;
           pp.UpdateOtherCarStatus(sensor_fusion_vec);
           pp.UpdateTarget();
-
-          vector<double> ptsx;
-          vector<double> ptsy;
-
-          Utils::Segment last_seg = pp.GetLastSegment();
-
-          ptsx.push_back(last_seg.x_prev_);
-          ptsx.push_back(last_seg.x_);
-
-          ptsy.push_back(last_seg.y_prev_);
-          ptsy.push_back(last_seg.y_);
-
-          ref_x = last_seg.x_;
-          ref_y = last_seg.y_;
-          ref_yaw = last_seg.GetYaw();
-
-          vector<double> next_wp0 = getXY(pp.target_car_.s_ + 30, (2 + 4 * pp.target_lane_num_), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-          vector<double> next_wp1 = getXY(pp.target_car_.s_ + 60, (2 + 4 * pp.target_lane_num_), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-          vector<double> next_wp2 = getXY(pp.target_car_.s_ + 90, (2 + 4 * pp.target_lane_num_), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-
-          ptsx.push_back(next_wp0[0]);
-          ptsx.push_back(next_wp1[0]);
-          ptsx.push_back(next_wp2[0]);
-
-          ptsy.push_back(next_wp0[1]);
-          ptsy.push_back(next_wp1[1]);
-          ptsy.push_back(next_wp2[1]);
-
-
-          for(int i = 0; i < ptsx.size(); i++){
-
-            // transform coordinate
-            auto xy = Utils::TransformCoordinate(ptsx[i], ptsy[i], ref_x, ref_y, ref_yaw);
-            ptsx[i] = xy[0];
-            ptsy[i] = xy[1];
-          }
-
-          tk::spline s;
-
-          s.set_points(ptsx, ptsy);
-
-          for(int i = 0; i < previous_path_x.size(); i++){
-            next_x_vals.push_back(previous_path_x[i]);
-            next_y_vals.push_back(previous_path_y[i]);
-          }
-
-
-          double target_x = 30.0;
-          double target_y = s(target_x);
-          double target_dist = sqrt((target_x) * (target_x) + (target_y) * (target_y));
-
-          double x_add_on = 0;
-
-          for(int i = 1; i <= 50 - previous_path_x.size(); i++){
-            double N = (target_dist / (0.02 * pp.ref_velocity_ / 2.24));
-            double x_point = x_add_on + (target_x) / N;
-            double y_point = s(x_point);
-
-            x_add_on = x_point;
-
-            auto xy = TransformBackCoordinate(x_point, y_point, ref_x, ref_y, ref_yaw);
-            next_x_vals.push_back(xy[0]);
-            next_y_vals.push_back(xy[1]);
-
-          }
+          pp.CreateNextPath(map_waypoints_s, map_waypoints_x, map_waypoints_y, next_x_vals, next_y_vals);
 
           /////////////////////////////////////
 

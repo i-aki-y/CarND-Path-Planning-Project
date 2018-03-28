@@ -9,22 +9,26 @@
 #include "Utils.h"
 #include "CarInfo.h"
 #include "SensorFusion.h"
+#include "OtherCarStatus.h"
 
 class PathPlanner {
  public:
   PathPlanner(double init_ref_velocity, int init_lane_num,
               double forward_distance_threshold,
-              double delta_t, double lane_width);
+              int n_sample,
+              double delta_t, double lane_width, double max_velocity);
 
   const double delta_t_;
   const double lane_width_;
   const double forward_distance_threshold_;
-
+  int n_sample_;
   int target_lane_num_;
   double ref_velocity_;
+  double max_velocity_;
 
   bool too_close_ = false;
 
+  OtherCarStatus current_situation_ = OtherCarStatus();
   CarInfo target_car_ = CarInfo(0, 0, 0, 0, 0, 0);
 
 
@@ -36,8 +40,16 @@ class PathPlanner {
 
   void UpdateTarget();
   void UpdateOtherCarStatus(std::vector<SensorFusion> sensor_fusion_vec);
-  void CreateControlPoints(std::vector<double> &ptsx, std::vector<double> &ptsy,
-                           const std::vector<double> &maps_s, const std::vector<double> &maps_x, const std::vector<double> &maps_y);
+  void CreateControlPoints(const std::vector<double> &maps_s, const std::vector<double> &maps_x, const std::vector<double> &maps_y,
+                           std::vector<double> &ptsx, std::vector<double> &ptsy,
+                           double &ref_x, double &ref_y, double &ref_yaw);
+
+  void CreateSplinePath(const std::vector<double> &ptsx, const std::vector<double> &ptsy,
+                        const double &ref_x, const double &ref_y, const double &ref_yaw,
+                        std::vector<double> &next_ptsx, std::vector<double> &next_ptsy);
+
+  void CreateNextPath(const std::vector<double> &maps_s, const std::vector<double> &maps_x, const std::vector<double> &maps_y,
+                      std::vector<double> &next_ptsx, std::vector<double> &next_ptsy);
 
   Utils::Segment GetLastSegment();
 
@@ -52,6 +64,7 @@ class PathPlanner {
 
   void UpdateTargetLaneNum();
   void UpdateRefVelocity();
+  double GetFutureCarS(CarInfo car);
 
 };
 
