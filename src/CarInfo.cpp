@@ -5,7 +5,6 @@
 #include <math.h>
 #include "CarInfo.h"
 
-
 CarInfo::CarInfo(double x, double y, double s, double d, double yaw, double speed) {
 
   x_ = x;

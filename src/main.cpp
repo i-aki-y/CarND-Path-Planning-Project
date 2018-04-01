@@ -236,7 +236,7 @@ int main() {
           for (auto sf : sensor_fusion) {
             sensor_fusion_vec.push_back(SensorFusion(sf[0], sf[1], sf[2], sf[3], sf[4], sf[5], sf[6]));
           }
-          pp.ResetCurrentPathInfo(CarInfo(car_x, car_y, car_s, car_d, deg2rad(car_yaw), car_speed),
+          pp.ResetCurrentPathInfo(CarInfo(car_x, car_y, car_s, car_d, deg2rad(car_yaw), Utils::ToMS(car_speed)),
                                   previous_path_x, previous_path_y, end_path_s, end_path_d);
           pp.UpdateOtherCarStatus(sensor_fusion_vec);
           pp.UpdateTarget();

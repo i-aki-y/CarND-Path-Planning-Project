@@ -9,6 +9,7 @@
 
 class RoadStatus {
  public:
+  bool detect_forward_ = false;
   bool too_close_ = false;
   bool left_is_filled_ = false;
   bool right_is_filled_ = false;

@@ -73,16 +73,23 @@ static inline void TransformBackCoordinate(const double ref_x, const double ref_
   }
 }
 
-
 static inline double NormalizedDiff(double base_s, double target_s, double max_s) {
   double ds = (target_s - base_s);
-  while(ds > max_s / 2){
+  while (ds > max_s / 2) {
     ds -= max_s;
   }
-  while(ds < -max_s / 2){
+  while (ds < -max_s / 2) {
     ds += max_s;
   }
   return ds;
+}
+
+static inline double ToMPH(double v_ms) {
+  return 2.236 * v_ms;
+}
+
+static inline double ToMS(double v_mps) {
+  return 0.44704 * v_mps;
 }
 
 };

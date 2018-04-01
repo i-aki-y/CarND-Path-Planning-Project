@@ -64,11 +64,13 @@ class PathPlanner {
   void UpdateTargetLaneNum();
   void UpdateRefVelocity();
   double PredictFutureS(CarInfo car);
-  bool IsTooClose(double other_s);
+  bool HasCloseForward(double other_s);
+  bool HasTooCloseForward(double other_s);
   bool IsFilled(double other_s);
   bool CanSwitchToLeft();
   bool CanSwitchToRight();
   bool IsAroundLaneCenter(int lane_num);
+  double GetModifedLaneNum(int lane_num);
 };
 
 #endif //PATH_PLANNING_PATHPLANNER_H
