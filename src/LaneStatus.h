@@ -8,9 +8,15 @@
 #include "SensorFusion.h"
 
 class LaneStatus {
-  bool is_filled_;
+ public:
+  bool is_valid_ = false;
+  bool is_filled_ = false;
   SensorFusion *forward_car_ = nullptr;
   SensorFusion *backward_car_ = nullptr;
+
+  LaneStatus(bool is_valid);
+  void UpdateForward(SensorFusion sf);
+
 };
 
 #endif //PATH_PLANNING_LANESTATUS_H

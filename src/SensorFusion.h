@@ -15,7 +15,7 @@ class SensorFusion{
   virtual ~SensorFusion();
 
   int id_;
-  CarInfo car_info_ = CarInfo(0, 0, 0, 0, 0, 0);
+  CarInfo car_ = CarInfo(0, 0, 0, 0, 0, 0);
 
 };
 

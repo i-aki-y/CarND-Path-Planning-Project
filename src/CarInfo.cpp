@@ -16,9 +16,21 @@ CarInfo::CarInfo(double x, double y, double s, double d, double yaw, double spee
   speed_ = speed;
 }
 
+int CarInfo::GetLaneNum(double lane_width){
+  return (int) (d_ / lane_width);
+}
+
 // check d is in the n_th lane;
-bool CarInfo::IsLane(int lane_num, double lane_width = 4) {
-  return (d_ < lane_width * (lane_num + 1)) && (d_ > lane_width * lane_num);
+bool CarInfo::IsSameLaneOf(CarInfo car, double lane_width = 4) {
+  return GetLaneNum(lane_width) == car.GetLaneNum(lane_width);
+}
+
+bool CarInfo::IsLeftLaneOf(CarInfo car, double lane_width = 4) {
+  return GetLaneNum(lane_width) + 1 == car.GetLaneNum(lane_width);
+}
+
+bool CarInfo::IsRightLaneOf(CarInfo car, double lane_width = 4) {
+  return GetLaneNum(lane_width) - 1 == car.GetLaneNum(lane_width);
 }
 
 CarInfo CarInfo::CreateFromVelocity(double x, double y, double s, double d, double vx, double vy) {

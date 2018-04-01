@@ -186,7 +186,7 @@ int main() {
   }
   // 0:left, 1:middle, 2:right;
 
-  PathPlanner pp = PathPlanner(0.0, 1, 30, PATH_SMAPLE, DELTA_T, LANE_WIDTH, MAX_VELOCITY);
+  PathPlanner pp = PathPlanner(0.0, 1, 30, PATH_SMAPLE, DELTA_T, LANE_WIDTH, MAX_VELOCITY, max_s);
 
   h.onMessage([&pp, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
@@ -232,15 +232,12 @@ int main() {
 
 
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
-
-          pp.ResetCurrentPathInfo(CarInfo(car_x, car_y, car_s, car_d, deg2rad(car_yaw), car_speed),
-                                  previous_path_x, previous_path_y, end_path_s, end_path_d);
-
           vector<SensorFusion> sensor_fusion_vec;
           for (auto sf : sensor_fusion) {
             sensor_fusion_vec.push_back(SensorFusion(sf[0], sf[1], sf[2], sf[3], sf[4], sf[5], sf[6]));
           }
-
+          pp.ResetCurrentPathInfo(CarInfo(car_x, car_y, car_s, car_d, deg2rad(car_yaw), car_speed),
+                                  previous_path_x, previous_path_y, end_path_s, end_path_d);
           pp.UpdateOtherCarStatus(sensor_fusion_vec);
           pp.UpdateTarget();
           pp.CreateNextPath(map_waypoints_s, map_waypoints_x, map_waypoints_y, next_x_vals, next_y_vals);

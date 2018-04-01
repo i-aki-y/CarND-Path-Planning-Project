@@ -2,9 +2,9 @@
 // Created by AkiyukiIshikawa on 2018/03/28.
 //
 
+#include <iostream>
 #include <math.h>
 
-#include <utility>
 #include "spline.h"
 #include "PathPlanner.h"
 
@@ -13,14 +13,15 @@ using namespace std;
 PathPlanner::PathPlanner(double init_ref_velocity, int init_lane_num,
                          double forward_distance_threshold,
                          int n_sample,
-                         double delta_t, double lane_width, double max_velocity):
+                         double delta_t, double lane_width, double max_velocity, double max_s):
     ref_velocity_(init_ref_velocity),
     target_lane_num_(init_lane_num),
     forward_distance_threshold_(forward_distance_threshold),
     n_sample_(n_sample),
     delta_t_(delta_t),
     lane_width_(lane_width),
-    max_velocity_(max_velocity)
+    max_velocity_(max_velocity),
+    max_s_(max_s)
 {
 
 }
@@ -31,53 +32,84 @@ void PathPlanner::UpdateTarget() {
   UpdateRefVelocity();
 }
 
-void PathPlanner::UpdateOtherCarStatus(std::vector<SensorFusion> sensor_fusion_vec) {
+void PathPlanner::UpdateOtherCarStatus(std::vector<SensorFusion> &sensor_fusion_vec) {
 
-  current_situation_.too_close_ = false;
+  current_situation_ = RoadStatus();
 
   // find ref_v to use
   for (SensorFusion sf : sensor_fusion_vec) {
 
-    double check_car_s = GetFutureCarS(sf.car_info_);
+    double check_car_s = PredictFutureS(sf.car_);
 
     // car is in my lane
-    if (sf.car_info_.IsLane(target_lane_num_, lane_width_)) {
-
-      if ((check_car_s > target_car_.s_) && ((check_car_s - target_car_.s_) < forward_distance_threshold_)) {
+    if (sf.car_.IsSameLaneOf(target_car_, lane_width_)) {
+      if (IsTooClose(check_car_s)) {
         current_situation_.too_close_ = true;
-        if (current_situation_.forward_car_) {
-          double nearest_s = GetFutureCarS(current_situation_.forward_car_->car_info_);
-          if ((nearest_s - target_car_.s_) > (sf.car_info_.s_ - target_car_.s_)) {
-            current_situation_.forward_car_ = &sf;
+
+        if (current_situation_.forward_car_ != nullptr) {
+          double new_ds = Utils::NormalizedDiff(target_car_.s_, sf.car_.s_, max_s_);
+          double cur_ds = Utils::NormalizedDiff(target_car_.s_, current_situation_.forward_car_->s_, max_s_);
+          if (new_ds < cur_ds) {
+            (*current_situation_.forward_car_) = sf.car_;
+            cout << "set speed " << current_situation_.forward_car_->speed_ << endl;
           }
+        } else {
+          current_situation_.forward_car_ = new CarInfo(sf.car_);
+          cout << "set speed " << current_situation_.forward_car_->speed_ << endl;
         }
       }
-    } else if ((target_lane_num_ - 1 >= 0) && sf.car_info_.IsLane(target_lane_num_ - 1, lane_width_)) {
-      if (current_situation_.left_forward_car_){
-        double nearest_s = GetFutureCarS(current_situation_.forward_car_->car_info_);
-        if((nearest_s - target_car_.s_) > (sf.car_info_.s_ - target_car_.s_)) {
-          current_situation_.forward_car_ = &sf;
-        }
+    } else if (sf.car_.IsLeftLaneOf(target_car_, lane_width_)) {
+      if(IsFilled(check_car_s)) {
+        current_situation_.left_is_filled_ = true;
       }
-
-    } else if ((target_lane_num_ + 1 <= 2) && sf.car_info_.IsLane(target_lane_num_ + 1, lane_width_)) {
-
+    } else if (sf.car_.IsRightLaneOf(target_car_, lane_width_)) {
+      if(IsFilled(check_car_s)) {
+        current_situation_.right_is_filled_ = true;
+      }
     }
   }
 }
 
 
 void PathPlanner::UpdateTargetLaneNum() {
-  if (target_lane_num_ == 0 && current_situation_.too_close_) {
-    target_lane_num_ = 1;
-  } else if (target_lane_num_ == 1 && current_situation_.too_close_) {
-    target_lane_num_ = 0;
+  int cur_lane_num = target_car_.GetLaneNum(lane_width_);
+
+  if (cur_lane_num != target_lane_num_) {
+    return;
+  }
+
+  if (!IsAroundLaneCenter(cur_lane_num)) {
+    return;
+  }
+
+  if (current_situation_.too_close_ && CanSwitchToLeft()) {
+    target_lane_num_--;
+  } else if (current_situation_.too_close_ && CanSwitchToRight()) {
+    target_lane_num_++;
+  }
+
+  if (!current_situation_.too_close_) {
+    if ((CanSwitchToLeft() && target_lane_num_ == 2) ||
+        (CanSwitchToRight() && target_lane_num_ == 0)) {
+      target_lane_num_ = 1;
+    }
+  }
+
+  if (current_situation_.too_close_) {
+    cout << target_lane_num_ << "/" << current_situation_.left_is_filled_ << ":" << current_situation_.right_is_filled_
+         << endl;
   }
 }
 
 void PathPlanner::UpdateRefVelocity() {
+
+  if ((current_situation_.too_close_) && (CanSwitchToLeft() || CanSwitchToRight())) {
+    return;
+  }
+
   if (current_situation_.too_close_) {
-    ref_velocity_ -= 0.224;  // ~ 5 m/s^2
+    // ref_velocity_ -= 0.224;  // ~ 5 m/s^2
+    ref_velocity_ -= 0.224;  //
   } else if (ref_velocity_ < max_velocity_) {
     ref_velocity_ += 0.224;
   }
@@ -208,6 +240,30 @@ void PathPlanner::CreateNextPath(const std::vector<double> &maps_s,
 
 }
 
-double PathPlanner::GetFutureCarS(CarInfo car) {
+double PathPlanner::PredictFutureS(CarInfo car) {
   return car.s_ + (static_cast<double>(prev_size_) * delta_t_ * car.speed_);
+}
+
+bool PathPlanner::IsTooClose(double other_s){
+  double ds = Utils::NormalizedDiff(target_car_.s_, other_s, max_s_);
+  return (ds > 0) && (ds < forward_distance_threshold_);
+}
+
+bool PathPlanner::IsFilled(double other_s){
+  double ds = Utils::NormalizedDiff(target_car_.s_, other_s, max_s_);
+  return (ds + 0.5 * forward_distance_threshold_> 0) && (ds < 1.25 * forward_distance_threshold_);
+}
+
+bool PathPlanner::CanSwitchToLeft(){
+  return !current_situation_.left_is_filled_ && target_lane_num_ > 0;
+}
+
+bool PathPlanner::CanSwitchToRight(){
+  return !current_situation_.right_is_filled_ && target_lane_num_ < 2;
+}
+
+bool PathPlanner::IsAroundLaneCenter(int lane_num) {
+  double center_d = (lane_num + 0.5) * lane_width_;
+
+  return (abs(target_car_.d_ - center_d) < 0.2 * lane_width_);
 }

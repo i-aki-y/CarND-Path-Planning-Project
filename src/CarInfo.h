@@ -19,7 +19,10 @@ class CarInfo {
 
   static CarInfo CreateFromVelocity(double x, double y, double s, double d, double vx, double vy);
 
-  bool IsLane(int lane_num, double lane_width);
+  int GetLaneNum(double lane_width);
+  bool IsSameLaneOf(CarInfo car, double lane_width);
+  bool IsLeftLaneOf(CarInfo car, double lane_width);
+  bool IsRightLaneOf(CarInfo car, double lane_width);
   double GetPrevX();
   double GetPrevY();
 };

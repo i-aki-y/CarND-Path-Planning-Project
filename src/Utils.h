@@ -73,6 +73,18 @@ static inline void TransformBackCoordinate(const double ref_x, const double ref_
   }
 }
 
+
+static inline double NormalizedDiff(double base_s, double target_s, double max_s) {
+  double ds = (target_s - base_s);
+  while(ds > max_s / 2){
+    ds -= max_s;
+  }
+  while(ds < -max_s / 2){
+    ds += max_s;
+  }
+  return ds;
+}
+
 };
 
 #endif //PATH_PLANNING_UTILS_H
