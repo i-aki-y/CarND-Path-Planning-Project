@@ -60,7 +60,7 @@ $$
 $$
 where $v_{\rm{ref}}$ is the target velocity because the car velocity is determined by the interval of the path points.
 
-In order to determine the $x', y'$ of the interval $\Delta r$, I select a curve in a small region $[0, x_a']$ in $x'$-axis and approximate the distance along the curve with the distance $r$ between $(0, 0)$ and $(x_a', f(x_a'))$, which is given by
+In order to determine the $x', y'$ of the interval $\Delta r$, I select a curve in a small region $[0, x_a']$ in $x'$-axis and approximate the distance along the curve with the distance $r$ between $(0, 0)$ and $(x_a', f(x_a'))$, which is given by
 $$
   r = \sqrt{(x_a')^2 + f(x_a')^2}.
 $$
@@ -90,7 +90,7 @@ The implementation of next path points are given in the `PathPlanner::CreateSpli
 
 If my car finds any other car running ahead in a given threshold distance, my car will decide (1) switch lane and pass the other car, or (2) slows down and follows the ahead car.
 
-Whenever there is no other car in another lane around my car, my car will switch the lane. The criteria whether another car exist or not is introduced by $[s_c - b, s_c + a]$ in $s$-coordinate of Frenet Coordinate, where $s_c$ is the car $s$-coordinate, and $a$ and $b$ are parameter of the model. If large values are set $a$ and $b$, my car will be more defensive, since my car will decide to switch lanes only the time when there is no car over a wide region.
+Whenever there is no other car in another lane around my car, my car will switch the lane. The criteria whether another car exist or not is introduced by $[s_c - b, s_c + a]$ in $s$-coordinate of Frenet Coordinate, where $s_c$ is the car $s$-coordinate, and $a$ and $b$ are parameter of the model. If large values are set $a$ and $b$, my car will be more defensive, since my car will decide to switch lanes only the time when there is no car over a wide region.
 
 Figure 3 shows that situations. In the case of Figure (a) where my car (the black one) can find in the right lane that there is no car in the region of $[s_c-b, s_c + a]$ while in the left region another car (yellow one) exists, so that my car can switch the lane. On the other hand, in the case of Figure (b), both lanes are filled by other cars. Therefore my car stays middle lane and follows the other car in front.
 
