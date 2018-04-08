@@ -10,6 +10,7 @@
 
 namespace Utils {
 
+// This class represent a line segment
 class Segment {
  public:
   Segment(double, double, double, double);
@@ -20,12 +21,15 @@ class Segment {
   double GetYaw();
 };
 
+// This function is moved from main.cpp
 std::vector<double> getXY(double s,
                           double d,
                           const std::vector<double> &maps_s,
                           const std::vector<double> &maps_x,
                           const std::vector<double> &maps_y);
 
+
+// Coordinate transformation
 static inline std::vector<double> TransformCoordinate(const double ref_x, const double ref_y, const double ref_yaw,
                                                       const double x, const double y) {
 
@@ -38,6 +42,7 @@ static inline std::vector<double> TransformCoordinate(const double ref_x, const 
   return {x_trans, y_trans};
 }
 
+// Backward coordinate transformation
 static inline std::vector<double> TransformBackCoordinate(const double ref_x, const double ref_y, const double ref_yaw,
                                                           const double x, const double y) {
 
@@ -50,6 +55,7 @@ static inline std::vector<double> TransformBackCoordinate(const double ref_x, co
   return {x_back, y_back};
 }
 
+// Coordinate transformation for vector variable
 static inline void TransformCoordinate(const double ref_x, const double ref_y, const double ref_yaw,
                                        std::vector<double> &xs, std::vector<double> &ys) {
   size_t n = xs.size();
@@ -61,6 +67,7 @@ static inline void TransformCoordinate(const double ref_x, const double ref_y, c
   }
 }
 
+// Backward coordinate transformation for vector variable
 static inline void TransformBackCoordinate(const double ref_x, const double ref_y, const double ref_yaw,
                                            std::vector<double> &xs, std::vector<double> &ys) {
 
@@ -73,6 +80,10 @@ static inline void TransformBackCoordinate(const double ref_x, const double ref_
   }
 }
 
+
+// Return normalized Frenet coordinate distance: ds = (target_s - base_s).
+// when target_s = 1 and base_s = 6945.554 (= max_s),
+// this function returns ds = 1 not -6944.554.
 static inline double NormalizedDiff(double base_s, double target_s, double max_s) {
   double ds = (target_s - base_s);
   while (ds > max_s / 2) {
@@ -84,10 +95,12 @@ static inline double NormalizedDiff(double base_s, double target_s, double max_s
   return ds;
 }
 
+// convert velocity from m/s to mph
 static inline double ToMPH(double v_ms) {
   return 2.236 * v_ms;
 }
 
+// convert velocity from mph to m/s
 static inline double ToMS(double v_mps) {
   return 0.44704 * v_mps;
 }

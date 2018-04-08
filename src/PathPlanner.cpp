@@ -27,15 +27,22 @@ PathPlanner::PathPlanner(double init_ref_velocity, int init_lane_num,
 
 }
 
-
+// Calculate next target lane number and target velocity
 void PathPlanner::UpdateTarget() {
   UpdateTargetLaneNum();
   UpdateRefVelocity();
 }
 
+// Update road status from given sensor fusion data.
+//
+// other car is in front                      -> `detect_forward_ = true`
+// other car is in front and is in very close -> `too_close_ = true`
+// other car is in left lane                  -> `left_is_filled_ = true`
+// other car is in right lane                 -> `right_is_filled_ = true`
+//
 void PathPlanner::UpdateOtherCarStatus(std::vector<SensorFusion> &sensor_fusion_vec) {
 
-  current_situation_ = RoadStatus();
+  road_status_ = RoadStatus();
 
   // find ref_v to use
   for (SensorFusion sf : sensor_fusion_vec) {
@@ -46,42 +53,47 @@ void PathPlanner::UpdateOtherCarStatus(std::vector<SensorFusion> &sensor_fusion_
     if (sf.car_.IsSameLaneOf(target_car_, lane_width_)) {
       if (HasCloseForward(check_car_s)) {
         // If there is a car close
-        current_situation_.detect_forward_ = true;
+        road_status_.detect_forward_ = true;
         if (HasTooCloseForward(sf.car_.s_)) {
-          current_situation_.too_close_ = true;
+          road_status_.too_close_ = true;
         }
 
-        if (current_situation_.forward_car_ != nullptr) {
+        if (road_status_.forward_car_ != nullptr) {
           double new_ds = Utils::NormalizedDiff(target_car_.s_, check_car_s, max_s_);
 
           // get current forward car's future distance in s
-          double cur_s = PredictFutureS(*current_situation_.forward_car_);
+          double cur_s = PredictFutureS(*road_status_.forward_car_);
           double cur_ds = Utils::NormalizedDiff(target_car_.s_, cur_s, max_s_);
 
+          // In order to adjust the velocity later, the nearest car in front is stored
           if (new_ds < cur_ds) {
             // if new distance of s closer than current s, update forward_car
-            (*current_situation_.forward_car_) = sf.car_;
+            (*road_status_.forward_car_) = sf.car_;
           }
         } else {
-          current_situation_.forward_car_ = new CarInfo(sf.car_);
+          road_status_.forward_car_ = new CarInfo(sf.car_);
         }
       }
     } else if (sf.car_.IsLeftLaneOf(target_car_, lane_width_)) {
       if (IsFilled(check_car_s)) {
-        current_situation_.left_is_filled_ = true;
+        road_status_.left_is_filled_ = true;
       }
     } else if (sf.car_.IsRightLaneOf(target_car_, lane_width_)) {
       if (IsFilled(check_car_s)) {
-        current_situation_.right_is_filled_ = true;
+        road_status_.right_is_filled_ = true;
       }
     }
   }
 }
 
-
+// Update target lane
+// When current lane != target lane
 void PathPlanner::UpdateTargetLaneNum() {
+  // current lane is detected from the current car position.
   int cur_lane_num = target_car_.GetLaneNum(lane_width_);
 
+  // If cuurent lane and target lane is not same,
+  // it is considered that the car is switching the lane.
   if (cur_lane_num != target_lane_num_) {
     return;
   }
@@ -90,13 +102,13 @@ void PathPlanner::UpdateTargetLaneNum() {
     return;
   }
 
-  if (current_situation_.detect_forward_ && CanSwitchToLeft()) {
+  if (road_status_.detect_forward_ && CanSwitchToLeft()) {
     target_lane_num_--;
-  } else if (current_situation_.detect_forward_ && CanSwitchToRight()) {
+  } else if (road_status_.detect_forward_ && CanSwitchToRight()) {
     target_lane_num_++;
   }
 
-  if (!current_situation_.detect_forward_) {
+  if (!road_status_.detect_forward_) {
     if ((CanSwitchToLeft() && target_lane_num_ == 2) ||
         (CanSwitchToRight() && target_lane_num_ == 0)) {
       target_lane_num_ = 1;
@@ -106,10 +118,10 @@ void PathPlanner::UpdateTargetLaneNum() {
 
 void PathPlanner::UpdateRefVelocity() {
 
-  if (current_situation_.detect_forward_) {
+  if (road_status_.detect_forward_) {
     // Detected a forward car which is close to the target car.
 
-    CarInfo fw_car = *current_situation_.forward_car_;
+    CarInfo fw_car = *road_status_.forward_car_;
     double fw_car_mph = Utils::ToMPH(fw_car.speed_);
     double fw_car_ds = Utils::NormalizedDiff(target_car_.s_, fw_car.s_, max_s_);
 
@@ -126,7 +138,7 @@ void PathPlanner::UpdateRefVelocity() {
       return;
     }
 
-    if (current_situation_.too_close_) {
+    if (road_status_.too_close_) {
       // When the forward car is too close, speed down a lot.
       cout << "too close!" << endl;
       ref_velocity_ -= 0.268;  // ~ 6 m/s^2
@@ -291,11 +303,11 @@ bool PathPlanner::IsFilled(double other_s){
 }
 
 bool PathPlanner::CanSwitchToLeft(){
-  return !current_situation_.left_is_filled_ && target_lane_num_ > 0;
+  return !road_status_.left_is_filled_ && target_lane_num_ > 0;
 }
 
 bool PathPlanner::CanSwitchToRight(){
-  return !current_situation_.right_is_filled_ && target_lane_num_ < 2;
+  return !road_status_.right_is_filled_ && target_lane_num_ < 2;
 }
 
 bool PathPlanner::IsAroundLaneCenter(int lane_num) {

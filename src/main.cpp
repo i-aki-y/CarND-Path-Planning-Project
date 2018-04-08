@@ -143,9 +143,14 @@ vector<double> getFrenet(double x, double y, double theta, const vector<double> 
 
 //
 const double LANE_WIDTH = 4;
-const double DELTA_T = 0.02;
-const double MAX_VELOCITY = 49.5; // mph
+const double DELTA_T = 0.02;  // time interval
+const double MAX_VELOCITY = 49.5;  // mph
 const int PATH_SMAPLE = 50;
+
+const double INIT_REF_VELOCITY = 0.0;
+const double INIT_THRESHOLD = 30.0;
+const int INIT_TARGET_LANE_NUM = 1;  // 0:left, 1:middle, 2:right;
+
 
 
 int main() {
@@ -184,9 +189,10 @@ int main() {
   	map_waypoints_dx.push_back(d_x);
   	map_waypoints_dy.push_back(d_y);
   }
-  // 0:left, 1:middle, 2:right;
 
-  PathPlanner pp = PathPlanner(0.0, 1, 30, PATH_SMAPLE, DELTA_T, LANE_WIDTH, MAX_VELOCITY, max_s);
+  // Initialize path planner
+  PathPlanner pp = PathPlanner(INIT_REF_VELOCITY, INIT_TARGET_LANE_NUM, INIT_THRESHOLD,
+							   PATH_SMAPLE, DELTA_T, LANE_WIDTH, MAX_VELOCITY, max_s);
 
   h.onMessage([&pp, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
