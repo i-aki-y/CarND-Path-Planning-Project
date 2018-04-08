@@ -98,19 +98,24 @@ void PathPlanner::UpdateTargetLaneNum() {
     return;
   }
 
+  // When current lane is not around the center of any lane,
+  // it is considered that the lane switching operation is not completed
   if (!IsAroundLaneCenter(cur_lane_num)) {
     return;
   }
 
   if (road_status_.detect_forward_ && CanSwitchToLeft()) {
+    // switch to left lane
     target_lane_num_--;
   } else if (road_status_.detect_forward_ && CanSwitchToRight()) {
+    // switch to right lane
     target_lane_num_++;
   }
 
   if (!road_status_.detect_forward_) {
     if ((CanSwitchToLeft() && target_lane_num_ == 2) ||
         (CanSwitchToRight() && target_lane_num_ == 0)) {
+      // now, my car is the left or right lane and the middle lane is empty
       target_lane_num_ = 1;
     }
   }
@@ -125,6 +130,7 @@ void PathPlanner::UpdateRefVelocity() {
     double fw_car_mph = Utils::ToMPH(fw_car.speed_);
     double fw_car_ds = Utils::NormalizedDiff(target_car_.s_, fw_car.s_, max_s_);
 
+    /*
     cout << std::fixed << std::setprecision(2)
          << ref_velocity_
          << " : " << fw_car_mph
@@ -132,15 +138,16 @@ void PathPlanner::UpdateRefVelocity() {
          << " : " << target_car_.s_
          << " : " << fw_car.s_
          << endl;
+    */
 
     if (CanSwitchToLeft() || CanSwitchToRight()) {
-      // If the target car can switch lane, keep the velocity.
+      // If my car can switch lane, keep the velocity.
       return;
     }
 
     if (road_status_.too_close_) {
       // When the forward car is too close, speed down a lot.
-      cout << "too close!" << endl;
+      //cout << "too close!" << endl;
       ref_velocity_ -= 0.268;  // ~ 6 m/s^2
     } else if (ref_velocity_ - 5 > fw_car_mph) {
       // Speed down gradually but not too much.
@@ -155,6 +162,7 @@ void PathPlanner::UpdateRefVelocity() {
   }
 }
 
+// Reset car and previous path information.
 void PathPlanner::ResetCurrentPathInfo(CarInfo current_car,
                                        std::vector<double> previous_path_x,
                                        std::vector<double> previous_path_y,
@@ -174,7 +182,7 @@ void PathPlanner::ResetCurrentPathInfo(CarInfo current_car,
 
 }
 
-
+// Create control points for spline curve
 void PathPlanner::CreateControlPoints(const std::vector<double> &maps_s, const std::vector<double> &maps_x,
                                       const std::vector<double> &maps_y, std::vector<double> &ptsx, std::vector<double> &ptsy,
                                       double &ref_x, double &ref_y, double &ref_yaw) {
@@ -212,21 +220,14 @@ void PathPlanner::CreateControlPoints(const std::vector<double> &maps_s, const s
 
 }
 
+//
 void PathPlanner::CreateSplinePath(const std::vector<double> &ptsx,
                                    const std::vector<double> &ptsy,
-                                   const double &ref_x,
-                                   const double &ref_y,
-                                   const double &ref_yaw,
-                                   std::vector<double> &next_ptsx,
-                                   std::vector<double> &next_ptsy) {
+                                   std::vector<double> &new_ptsx,
+                                   std::vector<double> &new_ptsy) {
   tk::spline s;
 
   s.set_points(ptsx, ptsy);
-
-  for(int i = 0; i < prev_size_; i++) {
-    next_ptsx.push_back(previous_path_x_[i]);
-    next_ptsy.push_back(previous_path_y_[i]);
-  }
 
   double target_x = 30.0;
   double target_y = s(target_x);
@@ -235,16 +236,14 @@ void PathPlanner::CreateSplinePath(const std::vector<double> &ptsx,
   double x_add_on = 0;
 
   for(int i = 1; i <= n_sample_ - prev_size_; i++) {
-
     double N = (target_dist / (delta_t_ * ref_velocity_ / 2.24));
     double x_point = x_add_on + (target_x) / N;
     double y_point = s(x_point);
 
     x_add_on = x_point;
 
-    auto xy = Utils::TransformBackCoordinate(ref_x, ref_y, ref_yaw, x_point, y_point);
-    next_ptsx.push_back(xy[0]);
-    next_ptsy.push_back(xy[1]);
+    new_ptsx.push_back(x_point);
+    new_ptsy.push_back(y_point);
   }
 }
 
@@ -270,6 +269,9 @@ void PathPlanner::CreateNextPath(const std::vector<double> &maps_s,
 
   vector<double> ptsx;
   vector<double> ptsy;
+  vector<double> new_ptsx;
+  vector<double> new_ptsy;
+
   double ref_x = target_car_.x_;
   double ref_y = target_car_.y_;
   double ref_yaw = target_car_.yaw_;
@@ -278,8 +280,19 @@ void PathPlanner::CreateNextPath(const std::vector<double> &maps_s,
 
   Utils::TransformCoordinate(ref_x, ref_y, ref_yaw, ptsx, ptsy);
 
-  CreateSplinePath(ptsx, ptsy, ref_x, ref_y, ref_yaw, next_ptsx, next_ptsy);
+  CreateSplinePath(ptsx, ptsy, new_ptsx, new_ptsy);
 
+  Utils::TransformBackCoordinate(ref_x, ref_y, ref_yaw, new_ptsx, new_ptsy);
+
+  for (int i = 0; i < prev_size_; i++) {
+    next_ptsx.push_back(previous_path_x_[i]);
+    next_ptsy.push_back(previous_path_y_[i]);
+  }
+
+  for (int i = 0; i < new_ptsx.size(); i++) {
+    next_ptsx.push_back(new_ptsx[i]);
+    next_ptsy.push_back(new_ptsy[i]);
+  }
 
 }
 

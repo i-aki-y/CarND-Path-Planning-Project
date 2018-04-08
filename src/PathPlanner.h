@@ -55,7 +55,6 @@ class PathPlanner {
   void UpdateTargetLaneNum();
   void UpdateRefVelocity();
   void CreateSplinePath(const std::vector<double> &ptsx, const std::vector<double> &ptsy,
-                        const double &ref_x, const double &ref_y, const double &ref_yaw,
                         std::vector<double> &next_ptsx, std::vector<double> &next_ptsy);
   Utils::Segment GetLastSegment();
   double PredictFutureS(CarInfo car);
